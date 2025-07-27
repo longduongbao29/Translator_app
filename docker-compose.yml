@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: voice_translator_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "${VTA_POSTGRES_PORT}:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - voice_translator_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: voice_translator_redis
+    ports:
+      - "${VTA_REDIS_PORT}:6379"
+    volumes:
+      - ./redis_data:/data
+    networks:
+      - voice_translator_network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  adminer:
+    image: adminer:latest
+    container_name: voice_translator_adminer
+    ports:
+      - "${VTA_ADMINER_PORT}:8080"
+    networks:
+      - voice_translator_network
+    depends_on:
+      - postgres    
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: voice_translator_redis_commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis_password
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "${VTA_REDIS_CMD_PORT}:8081"
+    networks:
+      - voice_translator_network
+    depends_on:
+      - redis
+networks:
+  voice_translator_network:
+    driver: bridge
