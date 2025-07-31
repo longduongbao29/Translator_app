@@ -1,89 +1,69 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import numpy as np
-from scipy.signal import resample
+import os
 import json
-import asyncio
-import threading
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from app.utils.logger import Logger
+from app.services.speech2text import SpeechToTextService
 
-from app.utils.logger import logger
-
-# Giả sử RealtimeSTT đã cài đặt trong PYTHONPATH
-from RealtimeSTT import AudioToTextRecorder
-
+logger = Logger(__name__)
 router = APIRouter()
 
-recorder = None
-recorder_ready = threading.Event()
-
-def decode_and_resample(audio_data, original_sample_rate, target_sample_rate):
-    audio_np = np.frombuffer(audio_data, dtype=np.int16)
-    num_original_samples = len(audio_np)
-    num_target_samples = int(num_original_samples * target_sample_rate / original_sample_rate)
-    resampled_audio = resample(audio_np, num_target_samples)
-    return resampled_audio.astype(np.int16).tobytes()
-
-def get_recorder(on_realtime_transcription_stabilized):
-    config = {
-        'spinner': False,
-        'use_microphone': False,
-        'model': 'tiny',
-        'language': 'en',
-        'silero_sensitivity': 0.4,
-        'webrtc_sensitivity': 2,
-        'post_speech_silence_duration': 0.7,
-        'min_length_of_recording': 0,
-        'min_gap_between_recordings': 0,
-        'enable_realtime_transcription': True,
-        'realtime_processing_pause': 0,
-        'realtime_model_type': 'tiny.en',
-        'on_realtime_transcription_stabilized': on_realtime_transcription_stabilized,
-    }
-    return AudioToTextRecorder(**config)
+@router.get("/test")
+async def test_endpoint():
+    return {"message": "Speech2Text endpoint is working"}
 
 @router.websocket("/realtimestt")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, language: str = "en"):
+    logger.debug(f"WebSocket connection attempt with language: {language}")
     await websocket.accept()
-    loop = asyncio.get_event_loop()
-    full_sentence_queue = asyncio.Queue()
+    logger.debug("WebSocket connection accepted")
+    await websocket.send_text(json.dumps({
+        "status": "connected", 
+        "message": f"WebSocket ready to receive audio (language: {language})"
+    }))
 
-    def on_realtime_text(text):
-        # Gửi text realtime về client
-        coro = websocket.send_text(json.dumps({'type': 'realtime', 'text': text}))
-        asyncio.run_coroutine_threadsafe(coro, loop)
-
-    def recorder_thread_func():
-        global recorder
-        recorder = get_recorder(on_realtime_text)
-        recorder_ready.set()
-        while True:
-            full_sentence = recorder.text()
-            logger.debug(f"Full sentence: {full_sentence}")
-            # Đưa full sentence vào queue để gửi về client
-            loop.call_soon_threadsafe(full_sentence_queue.put_nowait, full_sentence)
-
-    # Khởi động thread cho recorder
-    thread = threading.Thread(target=recorder_thread_func, daemon=True)
-    thread.start()
-    recorder_ready.wait()
+    temp_filename = "app/public/temp_chunk.webm"
 
     try:
+        speech_service = SpeechToTextService("whisper-large-v3-turbo", temp_filename, language)
         while True:
-            message = await websocket.receive_bytes()
-            logger.debug(f"Received message of length {len(message)} bytes")
-            if not recorder_ready.is_set():
+            data = await websocket.receive_bytes()
+            if data:
+                logger.debug(f"Received data chunk of size {len(data)} bytes")
+            if len(data) < 1024:  # Skip very small chunks
+                logger.debug(f"Chunk too small ({len(data)} bytes), skipping transcription")
                 continue
-            metadata_length = int.from_bytes(message[:4], byteorder='little')
-            metadata_json = message[4:4+metadata_length].decode('utf-8')
-            metadata = json.loads(metadata_json)
-            sample_rate = metadata['sampleRate']
-            chunk = message[4+metadata_length:]
-            resampled_chunk = decode_and_resample(chunk, sample_rate, 16000)
-            recorder.feed_audio(resampled_chunk)
-
-            # Gửi full sentence nếu có
-            while not full_sentence_queue.empty():
-                full_sentence = await full_sentence_queue.get()
-                await websocket.send_text(json.dumps({'type': 'fullSentence', 'text': full_sentence}))
-
+            logger.debug("Processing transcription...")
+            
+            try:
+                # Write the audio chunk to a temporary file
+                if not speech_service.write_audio_chunk(data):
+                    logger.error("Failed to write audio chunk, skipping transcription")
+                    continue
+                # Call the Groq API for transcription
+                transcription = await speech_service.call_grop_api()
+                logger.debug(f"Transcription result (language: {language}): {transcription}")
+                # Send simple text response
+                if transcription and transcription.strip():
+                    response_data = {
+                        "text": transcription.strip()
+                    }
+                    await websocket.send_text(json.dumps(response_data))
+                else:
+                    logger.debug("Empty transcription result")
+                    
+            except Exception as transcription_error:
+                logger.error(f"Transcription failed: {transcription_error}")
+                # Don't send error to frontend, just skip this chunk
+                continue
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_filename):
+                    try:
+                        os.remove(temp_filename)
+                    except:
+                        pass
     except WebSocketDisconnect:
-        pass
+        logger.info("WebSocket connection closed")
+    except Exception as e:
+        logger.error(f"Error in WebSocket connection: {e}")
+  

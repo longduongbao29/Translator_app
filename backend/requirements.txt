@@ -16,5 +16,4 @@ passlib==1.7.4
 python-jose[cryptography]==3.3.0
 bcrypt==4.1.1
 pydantic[email]
-realtimestt==0.3.104
-ffmpeg-python==0.2.0
+groq

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { SpeechSynthesisState } from '../types';
 
 export const useSpeechSynthesis = () => {

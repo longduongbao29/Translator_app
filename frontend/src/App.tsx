@@ -3,7 +3,6 @@ import { Toaster } from 'react-hot-toast';
 import TranslatorInterface from './components/TranslatorInterface.tsx';
 import Header from './components/Header.tsx';
 import { Language } from './types';
-// import { translationApi } from './services/api.ts';
 
 function App() {
   const [languages] = useState<Language[]>([

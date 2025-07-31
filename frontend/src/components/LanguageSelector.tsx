@@ -17,36 +17,28 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   label,
   includeAuto = false,
 }) => {
-  const getLanguageName = (code: string) => {
-    if (code === 'auto') return 'Auto-detect';
-    const language = languages.find(lang => lang.code === code);
-    return language ? language.name : code;
-  };
 
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-secondary-700">
+    <div className="space-y-1">
+      <label className="block text-xs font-medium text-gray-600">
         {label}
       </label>
       <div className="relative">
         <select
           value={selectedLanguage}
           onChange={(e) => onLanguageChange(e.target.value)}
-          className="input-field appearance-none pr-10 cursor-pointer"
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none pr-8 cursor-pointer bg-white"
         >
           {includeAuto && (
             <option value="auto">Auto-detect</option>
           )}
           {languages.map((language) => (
             <option key={language.code} value={language.code}>
-              {language.name} ({language.native_name})
+              {language.name}
             </option>
           ))}
         </select>
-        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary-400 pointer-events-none" />
-      </div>
-      <div className="text-xs text-secondary-500">
-        Selected: {getLanguageName(selectedLanguage)}
+        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
       </div>
     </div>
   );
