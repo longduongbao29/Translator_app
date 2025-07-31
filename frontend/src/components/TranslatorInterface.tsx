@@ -3,16 +3,19 @@ import { toast } from 'react-hot-toast';
 import { Mic, MicOff, Volume2, VolumeX, Copy, RotateCcw, Loader2 } from 'lucide-react';
 import { Language, TranslationRequest, TranslationResponse } from '../types';
 import { translationApi } from '../services/api.ts';
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts';
+import { useAudioWebSocket } from '../hooks/useAudioWebSocket.ts';
+// import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.ts';
 import LanguageSelector from './LanguageSelector.tsx';
 import TextArea from './TextArea.tsx';
 
 interface TranslatorInterfaceProps {
   languages: Language[];
+  isSettingsOpen?: boolean;
+  onCloseSettings?: () => void;
 }
 
-const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) => {
+const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages, isSettingsOpen = false, onCloseSettings }) => {
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('auto');
@@ -21,28 +24,17 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
   const [isTranslating, setIsTranslating] = useState(false);
   const [lastTranslation, setLastTranslation] = useState<TranslationResponse | null>(null);
 
-  const speechRecognition = useSpeechRecognition(sourceLanguage === 'auto' ? 'en-US' : sourceLanguage);
+  // const speechRecognition = useSpeechRecognition(sourceLanguage === 'auto' ? 'en-US' : sourceLanguage);
+  const [isListening, setIsListening] = useState(false);
+  const [sttError, setSttError] = useState<string | undefined>(undefined);
+  const audioWS = useAudioWebSocket((text) => {
+    setSourceText((prev) => prev + (prev ? ' ' : '') + text);
+  });
   const speechSynthesis = useSpeechSynthesis();
 
-  // Auto-translate when source text changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (sourceText.trim() && sourceText !== lastTranslation?.source_text) {
-        handleTranslate();
-      }
-    }, 1000);
 
-    return () => clearTimeout(timeoutId);
-  }, [sourceText, sourceLanguage, targetLanguage, translationEngine]);
-
-  // Update source text from speech recognition
-  useEffect(() => {
-    if (speechRecognition.transcript) {
-      setSourceText(speechRecognition.transcript);
-    }
-  }, [speechRecognition.transcript]);
-
-  const handleTranslate = async () => {
+  // Memoize handleTranslate to avoid stale closure
+  const handleTranslate = React.useCallback(async () => {
     if (!sourceText.trim()) return;
 
     setIsTranslating(true);
@@ -68,7 +60,27 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
     } finally {
       setIsTranslating(false);
     }
-  };
+  }, [sourceText, sourceLanguage, targetLanguage, translationEngine]);
+
+  // Auto-translate when source text changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (sourceText.trim() && sourceText !== lastTranslation?.source_text) {
+        handleTranslate();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [sourceText, sourceLanguage, targetLanguage, translationEngine, handleTranslate, lastTranslation?.source_text]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      audioWS.stop();
+    };
+  }, [audioWS]);
+
+  // ...existing code...
 
   const handleSwapLanguages = () => {
     if (sourceLanguage === 'auto') return;
@@ -82,8 +94,10 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
   const handleClearAll = () => {
     setSourceText('');
     setTranslatedText('');
-    speechRecognition.resetTranscript();
     setLastTranslation(null);
+    setSttError(undefined);
+    audioWS.stop();
+    setIsListening(false);
   };
 
   const handleCopyText = async (text: string) => {
@@ -101,42 +115,59 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
     }
   };
 
-  const toggleVoiceRecognition = () => {
-    if (speechRecognition.isListening) {
-      speechRecognition.stopListening();
+  const toggleVoiceRecognition = async () => {
+    if (isListening) {
+      audioWS.stop();
+      setIsListening(false);
     } else {
-      speechRecognition.startListening();
+      setSttError(undefined);
+      try {
+        await audioWS.start();
+        setIsListening(true);
+      } catch (e) {
+        setSttError('Không thể truy cập micro hoặc WebSocket lỗi');
+        setIsListening(false);
+      }
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Engine Selection */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-secondary-900">Translation Engine</h2>
-          <div className="flex space-x-2">
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] relative">
             <button
-              onClick={() => setTranslationEngine('google')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'google'
-                ? 'bg-primary-600 text-white'
-                : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
-                }`}
+              className="absolute top-2 right-2 p-1 rounded hover:bg-secondary-100"
+              onClick={onCloseSettings}
+              title="Đóng"
             >
-              Google Translate
+              <span className="text-xl">×</span>
             </button>
-            <button
-              onClick={() => setTranslationEngine('openai')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'openai'
-                ? 'bg-primary-600 text-white'
-                : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
-                }`}
-            >
-              OpenAI
-            </button>
+            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Translation Engine</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setTranslationEngine('google')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'google'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                  }`}
+              >
+                Google Translate
+              </button>
+              <button
+                onClick={() => setTranslationEngine('openai')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'openai'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                  }`}
+              >
+                OpenAI
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Language Selection */}
       <div className="card">
@@ -177,22 +208,20 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-secondary-900">Source Text</h3>
             <div className="flex space-x-2">
-              {speechRecognition.isSupported && (
-                <button
-                  onClick={toggleVoiceRecognition}
-                  className={`p-2 rounded-lg transition-colors ${speechRecognition.isListening
-                    ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                    : 'bg-primary-100 text-primary-600 hover:bg-primary-200'
-                    }`}
-                  title={speechRecognition.isListening ? 'Stop listening' : 'Start voice input'}
-                >
-                  {speechRecognition.isListening ? (
-                    <MicOff className="w-4 h-4" />
-                  ) : (
-                    <Mic className="w-4 h-4" />
-                  )}
-                </button>
-              )}
+              <button
+                onClick={toggleVoiceRecognition}
+                className={`p-2 rounded-lg transition-colors ${isListening
+                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                  : 'bg-primary-100 text-primary-600 hover:bg-primary-200'
+                  }`}
+                title={isListening ? 'Nhấn lại để dừng ghi âm' : 'Bắt đầu ghi âm'}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={() => handleCopyText(sourceText)}
                 disabled={!sourceText}
@@ -211,16 +240,15 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({ languages }) 
             className="min-h-32"
           />
 
-          {speechRecognition.isListening && (
+          {isListening && (
             <div className="mt-3 flex items-center space-x-2 text-sm text-red-600">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
               <span>Listening...</span>
             </div>
           )}
-
-          {speechRecognition.error && (
+          {sttError && (
             <div className="mt-3 text-sm text-red-600">
-              Voice recognition error: {speechRecognition.error}
+              Voice recognition error: {sttError}
             </div>
           )}
         </div>

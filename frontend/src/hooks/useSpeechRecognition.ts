@@ -52,8 +52,8 @@ export const useSpeechRecognition = (language: string = 'en-US') => {
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+
+    const recognition = new window.webkitSpeechRecognition();
 
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -62,25 +62,30 @@ export const useSpeechRecognition = (language: string = 'en-US') => {
     recognition.addEventListener('result', (event: SpeechRecognitionEvent) => {
       let finalTranscript = '';
       let interimTranscript = '';
+      let lastConfidence = 0;
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         const confidence = event.results[i][0].confidence;
-
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
-          setState(prev => ({
-            ...prev,
-            transcript: finalTranscript,
-            confidence,
-          }));
+          lastConfidence = confidence;
         } else {
           interimTranscript += transcript;
-          setState(prev => ({
-            ...prev,
-            transcript: interimTranscript,
-          }));
         }
+      }
+
+      if (finalTranscript) {
+        setState(prev => ({
+          ...prev,
+          transcript: finalTranscript,
+          confidence: lastConfidence,
+        }));
+      } else if (interimTranscript) {
+        setState(prev => ({
+          ...prev,
+          transcript: interimTranscript,
+        }));
       }
     });
 
@@ -117,13 +122,22 @@ export const useSpeechRecognition = (language: string = 'en-US') => {
   }, [language]);
 
   const startListening = () => {
-    if (recognitionRef.current && !state.isListening) {
-      setState(prev => ({
-        ...prev,
-        transcript: '',
-        error: undefined,
-      }));
-      recognitionRef.current.start();
+    if (recognitionRef.current) {
+      // @ts-ignore: check for webkitSpeechRecognition state property
+      const rec: any = recognitionRef.current;
+      // Only start if not already started (state !== 'recording')
+      if (!state.isListening && (!rec.state || rec.state !== 'recording')) {
+        setState(prev => ({
+          ...prev,
+          transcript: '',
+          error: undefined,
+        }));
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          // swallow error if already started
+        }
+      }
     }
   };
 

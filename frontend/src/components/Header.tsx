@@ -1,7 +1,11 @@
 import React from 'react';
-import { Globe, Languages } from 'lucide-react';
+import { Globe, Languages, Settings } from 'lucide-react';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenSettings: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
   return (
     <header className="bg-white shadow-sm border-b border-secondary-200">
       <div className="container mx-auto px-4 py-6">
@@ -15,9 +19,18 @@ const Header: React.FC = () => {
               <p className="text-sm text-secondary-600">Translate text and speech in real-time</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-secondary-600">
-            <Languages className="w-5 h-5" />
-            <span className="text-sm font-medium">Multi-language Support</span>
+          <div className="flex items-center space-x-4 text-secondary-600">
+            <div className="flex items-center space-x-2">
+              <Languages className="w-5 h-5" />
+              <span className="text-sm font-medium">Multi-language Support</span>
+            </div>
+            <button
+              className="p-2 rounded-full hover:bg-secondary-100 transition-colors"
+              title="Cài đặt"
+              onClick={onOpenSettings}
+            >
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>

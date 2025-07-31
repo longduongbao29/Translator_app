@@ -23,6 +23,8 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json"
 )
 
+
+
 # Register shutdown handler
 atexit.register(log_shutdown)
 

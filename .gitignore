@@ -5,6 +5,8 @@
 .env.test
 .env.development
 
+hf_cache/
+test/
 # Python
 __pycache__/
 *.py[cod]

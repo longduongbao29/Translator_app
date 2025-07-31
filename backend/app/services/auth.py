@@ -6,7 +6,9 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from app.models import User
 from app.schemas import UserCreate
-from app.utils.logger import logger
+from app.utils.logger import Logger
+
+logger = Logger(__name__)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

@@ -7,7 +7,9 @@ import httpx
 from langdetect import detect, detect_langs
 from app.database import get_redis
 from app.schemas import TranslationResponse, LanguageDetectionResponse
-from app.utils.logger import logger
+from app.utils.logger import Logger
+
+logger = Logger(__name__)
 
 class TranslationService:
     def __init__(self):

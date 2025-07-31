@@ -3,11 +3,10 @@ import { Toaster } from 'react-hot-toast';
 import TranslatorInterface from './components/TranslatorInterface.tsx';
 import Header from './components/Header.tsx';
 import { Language } from './types';
-import { translationApi } from './services/api.ts';
+// import { translationApi } from './services/api.ts';
 
 function App() {
-  const [languages, setLanguages] = useState<Language[]>([
-    { code: 'auto', name: 'Auto-detect', native_name: 'Auto-detect', supports_offline: false },
+  const [languages] = useState<Language[]>([
     { code: 'en', name: 'English', native_name: 'English', supports_offline: true },
     { code: 'vi', name: 'Vietnamese', native_name: 'Tiếng Việt', supports_offline: true },
     { code: 'zh', name: 'Chinese', native_name: '中文', supports_offline: true },
@@ -23,34 +22,39 @@ function App() {
     { code: 'th', name: 'Thai', native_name: 'ไทย', supports_offline: true },
     { code: 'hi', name: 'Hindi', native_name: 'हिन्दी', supports_offline: true }
   ]);
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const fetchLanguages = async () => {
-      try {
-        setLoading(true);
-        const response = await translationApi.getLanguages();
-        if (response.success && response.data) {
-          setLanguages(response.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch languages:', error);
-        // Keep default languages if API fails
-      } finally {
-        setLoading(false);
-      }
-    };
-
     // Only fetch from API if backend is available
     // For now, we'll use the default languages
+    // Uncomment below to fetch languages from API
+    // const fetchLanguages = async () => {
+    //   try {
+    //     setLoading(true);
+    //     const response = await translationApi.getLanguages();
+    //     if (response.success && response.data) {
+    //       setLanguages(response.data);
+    //     }
+    //   } catch (error) {
+    //     console.error('Failed to fetch languages:', error);
+    //     // Keep default languages if API fails
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
     // fetchLanguages();
   }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Header />
+      <Header onOpenSettings={() => setIsSettingsOpen(true)} />
       <main className="container mx-auto px-4 py-8">
-        <TranslatorInterface languages={languages} />
+        <TranslatorInterface
+          languages={languages}
+          isSettingsOpen={isSettingsOpen}
+          onCloseSettings={() => setIsSettingsOpen(false)}
+        />
       </main>
       <Toaster
         position="top-right"

@@ -38,7 +38,9 @@ export const translationApi = {
   // Translate text
   translate: async (request: TranslationRequest): Promise<ApiResponse<TranslationResponse>> => {
     try {
-      const response = await api.post('/translate', request);
+      console.log('Translation request:', request);
+
+      const response = await api.post('/translate/translate', request);
       return {
         data: response.data,
         success: true,
@@ -54,7 +56,7 @@ export const translationApi = {
   // Detect language
   detectLanguage: async (text: string): Promise<ApiResponse<LanguageDetectionResponse>> => {
     try {
-      const response = await api.post('/detect-language', { text });
+      const response = await api.post('/translate/detect-language', { text });
       return {
         data: response.data,
         success: true,
@@ -70,7 +72,7 @@ export const translationApi = {
   // Get supported languages
   getLanguages: async (): Promise<ApiResponse<Language[]>> => {
     try {
-      const response = await api.get('/languages');
+      const response = await api.get('/translate/languages');
       return {
         data: response.data.languages,
         success: true,
@@ -86,7 +88,7 @@ export const translationApi = {
   // Get translation history
   getHistory: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
     try {
-      const response = await api.get(`/history?skip=${skip}&limit=${limit}`);
+      const response = await api.get(`/translate/history?skip=${skip}&limit=${limit}`);
       return {
         data: response.data.translations,
         success: true,
@@ -97,6 +99,36 @@ export const translationApi = {
         success: false,
       };
     }
+  },
+};
+
+export const speechToTextApi = {
+  connect: (onMessage: (message: string) => void, onError?: (error: Event) => void) => {
+    // Ensure correct WebSocket URL for backend route /api/v1/ws/realtimestt
+    let wsUrl = API_BASE_URL.replace('http', 'ws');
+    wsUrl = wsUrl.replace(/\/api\/v1$/, '');
+    const ws = new WebSocket(`${wsUrl}/api/v1/ws/realtimestt`);
+
+    ws.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
+    ws.onmessage = (event) => {
+      onMessage(event.data);
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      if (onError) {
+        onError(error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    return ws;
   },
 };
 
