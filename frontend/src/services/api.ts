@@ -103,6 +103,62 @@ export const translationApi = {
 };
 
 export const speechToTextApi = {
+  // Speech to text từ audio file
+  transcribeAudio: async (audioBlob: Blob, language: string = 'auto'): Promise<ApiResponse<{ text: string; language?: string }>> => {
+    try {
+      // Validate the audio blob
+      if (!audioBlob || audioBlob.size === 0) {
+        throw new Error('Invalid audio data: empty blob');
+      }
+
+      const formData = new FormData();
+
+      // Ensure the file has a proper extension
+      const fileName = `recording-${Date.now()}.webm`;
+
+      // Add form data fields
+      formData.append('audio', audioBlob, fileName);
+      formData.append('language', language);
+      formData.append('model_name', 'whisper-large-v3');
+
+      console.log('Sending audio for transcription:');
+      console.log('- Language:', language);
+      console.log('- File size:', audioBlob.size);
+      console.log('- File type:', audioBlob.type);
+      console.log('- File name:', fileName);
+
+      const response = await api.post('/speech2text/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 seconds timeout for audio processing
+      });
+
+      console.log('Transcription response:', response.data);
+
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      console.error('Speech to text error:', error);
+
+      // Log more detailed error information
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        console.error('Response data:', error.response.data);
+      } else if (error.request) {
+        console.error('Request was made but no response received');
+      }
+
+      return {
+        error: error.response?.data?.detail || error.message || 'Speech to text failed',
+        success: false,
+      };
+    }
+  },
+
   connect: (onMessage: (message: string) => void, onError?: (error: Event) => void) => {
     // Ensure correct WebSocket URL for backend route /api/v1/ws/realtimestt
     let wsUrl = API_BASE_URL.replace('http', 'ws');
