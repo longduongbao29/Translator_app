@@ -1,6 +1,30 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Voice Translator Mobile App
 
-# Getting Started
+This is the React Native mobile app version of the Voice Translator application.
+
+## Features
+
+- Text translation between multiple languages
+- Voice recording and speech-to-text conversion
+- Text-to-speech for translated content
+- Cross-platform support (iOS and Android)
+
+## Project Structure
+
+- `/src/components` - React components
+- `/src/hooks` - Custom React hooks
+- `/src/services` - API services
+- `/src/types` - TypeScript type definitions
+
+## Libraries Used
+
+- react-native - Core framework
+- react-native-audio-recorder-player - For audio recording
+- react-native-tts - For text-to-speech functionality
+- react-native-fs - For file system access
+- axios - For API requests
+
+## Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
