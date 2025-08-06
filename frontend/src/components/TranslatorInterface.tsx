@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext.tsx';
 import LanguageSelector from './LanguageSelector.tsx';
 import TextArea from './TextArea.tsx';
 
-
 interface TranslatorInterfaceProps {
   languages: Language[];
   isSettingsOpen?: boolean;
@@ -46,7 +45,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
       toast.error(audioRecorder.error);
     }
   }, [audioRecorder.error]);
-
   // Convert sourceLanguage to language code for speech recognition
   const getSpeechLanguage = useCallback(() => {
     // If auto-detect, pass 'auto' to backend to let Whisper auto-detect
@@ -63,7 +61,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     setSttError(undefined);
     setIsFavorite(false);
   };
-
   // Memoize handleTranslate to avoid stale closure
   const handleTranslate = useCallback(async () => {
     if (!sourceText.trim()) return;
@@ -99,7 +96,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
       if (response.success && response.data) {
         setTranslatedText(response.data.translated_text);
         setLastTranslation(response.data);
-
         // Nếu có trường is_favorite, cập nhật trạng thái favorite
         if (response.data.is_favorite !== undefined) {
           setIsFavorite(response.data.is_favorite);
@@ -270,9 +266,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     }
   };
 
-
-
-
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-4">
       {/* Settings Modal */}
@@ -312,16 +305,15 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                 </button>
               </div>
             </div>
-
-
           </div>
         </div>
       )}
-
       {/* Language Selection */}
+
       <div className="bg-white rounded-lg shadow-md p-4">
         <div className="flex items-center justify-center gap-3">
           <div className="flex-1 max-w-xs">
+
             <LanguageSelector
               languages={languages}
               selectedLanguage={sourceLanguage}
@@ -337,11 +329,11 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
             onClick={handleSwapLanguages}
             disabled={sourceLanguage === 'auto'}
             className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+
             title="Swap languages"
           >
             <ArrowLeftRight className="w-5 h-5 text-blue-600" />
           </button>
-
           <div className="flex-1 max-w-xs">
             <LanguageSelector
               languages={languages}
@@ -355,6 +347,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
       </div>
 
       {/* Translation Interface */}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Source Text */}
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -387,18 +380,17 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   <Mic className="w-5 h-5" />
                 )}
               </button>
-
               <button
                 onClick={() => handleCopyText(sourceText)}
                 disabled={!sourceText}
                 className="p-2.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+
                 title="Copy text"
               >
                 <Copy className="w-4 h-4" />
               </button>
             </div>
           </div>
-
           <div className="relative">
             <TextArea
               value={sourceText}
@@ -501,6 +493,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               onChange={() => { }} // Read-only
               placeholder="Translation will appear here..."
               className="min-h-36"
+
               readOnly
             />
 
@@ -516,6 +509,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
           {lastTranslation && (
             <div className="mt-2 text-xs text-gray-500">
+
               Translated using {lastTranslation.translation_engine}
               {lastTranslation.confidence && (
                 <span> • Confidence: {Math.round(lastTranslation.confidence * 100)}%</span>
@@ -525,6 +519,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   Login to save your translations
                 </div>
               )}
+
             </div>
           )}
         </div>

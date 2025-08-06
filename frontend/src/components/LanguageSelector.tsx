@@ -10,6 +10,7 @@ interface LanguageSelectorProps {
   includeAuto?: boolean;
   detectedLanguage?: string;
   isDetecting?: boolean;
+
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
@@ -43,6 +44,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           </span>
         )}
       </div>
+
       <div className="relative">
         <select
           value={selectedLanguage}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import TranslatorInterface from './components/TranslatorInterface.tsx';
 import Header from './components/Header.tsx';
@@ -25,7 +26,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   return <>{children}</>;
 };
-
 function App() {
   const [languages] = useState<Language[]>([
     { code: 'en', name: 'English', native_name: 'English', supports_offline: true },

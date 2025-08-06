@@ -23,6 +23,7 @@ export interface TranslationResponse {
   confidence?: number;
   created_at?: string;
   user_id?: number;
+
 }
 
 export interface LanguageDetectionResponse {
@@ -97,3 +98,4 @@ export interface UserPreferences {
   theme?: string;
   auto_detect?: boolean;
 }
+

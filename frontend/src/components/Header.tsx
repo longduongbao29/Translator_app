@@ -1,9 +1,11 @@
+
 import React, { useState, useRef } from 'react';
 import { Globe, Languages, ChevronDown, LogIn, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import LoginModal from './LoginModal.tsx';
 import RegisterModal from './RegisterModal.tsx';
 import UserMenu from './UserMenu.tsx';
+
 
 interface HeaderProps {
   onOpenSettings: () => void;

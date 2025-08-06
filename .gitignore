@@ -126,9 +126,6 @@ temp/
 # dotenv environment variables file
 .env.test
 
-
-
-
 # Temporary folders
 tmp/
 temp/
@@ -137,6 +134,7 @@ temp/
 config/keys.js
 config/config.json
 secrets.json
+
 
 # OSX
 #
@@ -213,3 +211,4 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
