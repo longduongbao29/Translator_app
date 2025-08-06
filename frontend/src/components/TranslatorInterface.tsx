@@ -29,6 +29,8 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [lastTranslation, setLastTranslation] = useState<TranslationResponse | null>(null);
   const [sttError, setSttError] = useState<string | undefined>(undefined);
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState('');
+  const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
 
   const speechSynthesis = useSpeechSynthesis();
   const audioRecorder = useAudioRecorder();
@@ -63,9 +65,28 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
     setIsTranslating(true);
     try {
+      // If source language is auto, use detected language if available
+      let actualSourceLang = sourceLanguage;
+      if (sourceLanguage === 'auto') {
+        if (detectedLanguage) {
+          actualSourceLang = detectedLanguage;
+        } else {
+          // If no detected language yet, try to detect
+          try {
+            const response = await translationApi.detectLanguage(sourceText);
+            if (response.success && response.data) {
+              actualSourceLang = response.data.detected_language;
+              setDetectedLanguage(response.data.detected_language);
+            }
+          } catch (error) {
+            console.error('Error detecting language during translation:', error);
+          }
+        }
+      }
+
       const request: TranslationRequest = {
         text: sourceText,
-        source_language: sourceLanguage,
+        source_language: actualSourceLang,
         target_language: targetLanguage,
         engine: translationEngine,
       };
@@ -73,13 +94,42 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
       if (response.success && response.data) {
         setTranslatedText(response.data.translated_text);
         setLastTranslation(response.data);
+
+        // Nếu là nguồn auto thì đặt source_language từ kết quả dịch làm ngôn ngữ đã phát hiện
+        if (sourceLanguage === 'auto' && response.data.source_language) {
+          setDetectedLanguage(response.data.source_language);
+        }
       }
     } catch (error) {
       toast.error('Translation failed. Please try again.');
     } finally {
       setIsTranslating(false);
     }
-  }, [sourceText, sourceLanguage, targetLanguage, translationEngine]);
+  }, [sourceText, sourceLanguage, targetLanguage, translationEngine, detectedLanguage]);
+
+  // Auto-detect language when source text changes and 'auto' is selected
+  useEffect(() => {
+    if (sourceLanguage === 'auto' && sourceText.trim()) {
+      setIsDetectingLanguage(true);
+
+      const detectTimeoutId = setTimeout(async () => {
+        try {
+          const response = await translationApi.detectLanguage(sourceText);
+          if (response.success && response.data) {
+            setDetectedLanguage(response.data.detected_language);
+          }
+        } catch (error) {
+          console.error('Error detecting language:', error);
+        } finally {
+          setIsDetectingLanguage(false);
+        }
+      }, 300); // Faster than translation timeout
+
+      return () => clearTimeout(detectTimeoutId);
+    } else if (!sourceText.trim() || sourceLanguage !== 'auto') {
+      setDetectedLanguage('');
+    }
+  }, [sourceText, sourceLanguage]);
 
   // Auto-translate when source text or languages change
   useEffect(() => {
@@ -97,6 +147,8 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
+    // Reset detected language when swapping
+    setDetectedLanguage('');
     // Không cần swap text nữa vì sẽ tự động translate lại
   };
 
@@ -229,6 +281,8 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               onLanguageChange={setSourceLanguage}
               label="From"
               includeAuto={true}
+              detectedLanguage={detectedLanguage}
+              isDetecting={isDetectingLanguage}
             />
           </div>
 
@@ -264,11 +318,19 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               <button
                 onClick={toggleVoiceRecognition}
                 className={`p-2.5 rounded-full transition-all duration-200 shadow-sm ${audioRecorder.isRecording
-                  ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+                    : sourceLanguage === 'auto'
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
-                title={audioRecorder.isRecording ? 'Stop recording' : 'Start recording'}
-                disabled={isProcessingAudio}
+                title={
+                  audioRecorder.isRecording
+                    ? 'Stop recording'
+                    : sourceLanguage === 'auto'
+                      ? 'Voice input not available with auto-detect language'
+                      : 'Start recording'
+                }
+                disabled={isProcessingAudio || sourceLanguage === 'auto'}
               >
                 {isProcessingAudio ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -320,6 +382,17 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
           {sttError && (
             <div className="mt-2 text-sm text-red-600">
               Error: {typeof sttError === 'object' ? JSON.stringify(sttError) : sttError}
+            </div>
+          )}
+
+          {sourceLanguage === 'auto' && !audioRecorder.isRecording && !isProcessingAudio && (
+            <div className="mt-2 text-sm text-amber-600 flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-info">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              Voice input requires selecting a specific language (auto-detect not supported).
             </div>
           )}
         </div>

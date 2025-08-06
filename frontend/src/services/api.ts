@@ -1,7 +1,18 @@
 import axios from 'axios';
-import { TranslationRequest, TranslationResponse, Language, LanguageDetectionResponse, ApiResponse } from '../types';
+import {
+  TranslationRequest,
+  TranslationResponse,
+  Language,
+  LanguageDetectionResponse,
+  ApiResponse,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  UserResponse
+} from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8003/api/v1';
+// Sử dụng mặc định là localhost
+const API_BASE_URL = 'http://localhost:8003/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -186,6 +197,202 @@ export const speechToTextApi = {
 
     return ws;
   },
+};
+
+export const authApi = {
+  // Login
+  login: async (credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
+    try {
+      // Chuyển đổi thành FormData theo yêu cầu của OAuth2
+      const formData = new FormData();
+      formData.append('username', credentials.username);
+      formData.append('password', credentials.password);
+
+      const response = await api.post('/auth/login', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      // Save token to localStorage
+      if (response.data.access_token) {
+        localStorage.setItem('authToken', response.data.access_token);
+      }
+
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Login failed',
+        success: false,
+      };
+    }
+  },
+
+  // Register
+  register: async (userData: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
+    try {
+      const response = await api.post('/auth/register', userData);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Registration failed',
+        success: false,
+      };
+    }
+  },
+
+  // Logout
+  logout: (): void => {
+    localStorage.removeItem('authToken');
+  },
+
+  // Get current user
+  getCurrentUser: async (): Promise<ApiResponse<UserResponse>> => {
+    try {
+      const response = await api.get('/auth/me');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch user info',
+        success: false,
+      };
+    }
+  },
+};
+
+export const userApi = {
+  // Get user profile
+  getProfile: async (): Promise<ApiResponse<UserResponse>> => {
+    try {
+      const response = await api.get('/users/me');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch profile',
+        success: false,
+      };
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (userData: Partial<UserResponse>): Promise<ApiResponse<UserResponse>> => {
+    try {
+      const response = await api.put('/users/me', userData);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update profile',
+        success: false,
+      };
+    }
+  },
+
+  // Upload avatar
+  uploadAvatar: async (file: File): Promise<ApiResponse<{ avatar_url: string }>> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/users/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to upload avatar',
+        success: false,
+      };
+    }
+  },
+
+  // Get user preferences
+  getPreferences: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.get('/users/preferences');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch preferences',
+        success: false,
+      };
+    }
+  },
+
+  // Update user preferences
+  updatePreferences: async (preferences: any): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put('/users/preferences', preferences);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update preferences',
+        success: false,
+      };
+    }
+  },
+};
+
+export const favoritesApi = {
+  // Get favorites
+  getFavorites: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
+    try {
+      const response = await api.get(`/translate/favorites?skip=${skip}&limit=${limit}`);
+      return {
+        data: response.data.favorites,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch favorites',
+        success: false,
+      };
+    }
+  },
+
+  // Toggle favorite status
+  toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put(`/translate/favorite/${translationId}`, {
+        is_favorite: isFavorite
+      });
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update favorite status',
+        success: false,
+      };
+    }
+  }
 };
 
 export default api;
