@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { Mic, MicOff, Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star } from 'lucide-react';
 import { Language, TranslationRequest, TranslationResponse } from '../types/index';
 import { translationApi, speechToTextApi } from '../services/api.ts';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.ts';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 import LanguageSelector from './LanguageSelector.tsx';
 import TextArea from './TextArea.tsx';
 
@@ -31,9 +32,12 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [detectedLanguage, setDetectedLanguage] = useState('');
   const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const speechSynthesis = useSpeechSynthesis();
   const audioRecorder = useAudioRecorder();
+  const { isAuthenticated } = useAuth();
 
   // Handle recorder errors
   useEffect(() => {
@@ -57,6 +61,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     setTranslatedText('');
     setLastTranslation(null);
     setSttError(undefined);
+    setIsFavorite(false);
   };
 
   // Memoize handleTranslate to avoid stale closure
@@ -94,6 +99,13 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
       if (response.success && response.data) {
         setTranslatedText(response.data.translated_text);
         setLastTranslation(response.data);
+
+        // Nếu có trường is_favorite, cập nhật trạng thái favorite
+        if (response.data.is_favorite !== undefined) {
+          setIsFavorite(response.data.is_favorite);
+        } else {
+          setIsFavorite(false);
+        }
 
         // Nếu là nguồn auto thì đặt source_language từ kết quả dịch làm ngôn ngữ đã phát hiện
         if (sourceLanguage === 'auto' && response.data.source_language) {
@@ -150,6 +162,41 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     // Reset detected language when swapping
     setDetectedLanguage('');
     // Không cần swap text nữa vì sẽ tự động translate lại
+  };
+
+  const toggleFavoriteTranslation = async () => {
+    // Kiểm tra xem người dùng đã đăng nhập chưa
+    if (!isAuthenticated) {
+      toast.error('Please login to save translations');
+      return;
+    }
+
+    // Kiểm tra xem có bản dịch và ID không
+    if (!lastTranslation || !lastTranslation.id) {
+      toast.error('No translation to save');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const newFavoriteState = !isFavorite;
+      const result = await translationApi.toggleFavorite(lastTranslation.id, newFavoriteState);
+
+      if (result.success) {
+        setIsFavorite(newFavoriteState);
+        toast.success(newFavoriteState
+          ? 'Translation saved to favorites'
+          : 'Translation removed from favorites'
+        );
+      } else {
+        toast.error(result.error || 'Failed to update favorite status');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite status:', error);
+      toast.error('Failed to update favorite status');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCopyText = async (text: string) => {
@@ -318,10 +365,10 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               <button
                 onClick={toggleVoiceRecognition}
                 className={`p-2.5 rounded-full transition-all duration-200 shadow-sm ${audioRecorder.isRecording
-                    ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-                    : sourceLanguage === 'auto'
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+                  : sourceLanguage === 'auto'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 title={
                   audioRecorder.isRecording
@@ -402,6 +449,27 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-900">Translation</h3>
             <div className="flex space-x-2">
+              {/* Favorite star button */}
+              {lastTranslation && lastTranslation.id && (
+                <button
+                  onClick={toggleFavoriteTranslation}
+                  disabled={!isAuthenticated || isSaving || !translatedText}
+                  className={`p-2.5 rounded-full ${!isAuthenticated
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : isFavorite
+                        ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    } transition-colors`}
+                  title={!isAuthenticated ? 'Login to save translations' : isFavorite ? 'Remove from favorites' : 'Save translation'}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
+                  )}
+                </button>
+              )}
+
               {typeof window !== 'undefined' && window.speechSynthesis && (
                 <button
                   onClick={() => handleSpeakText(translatedText, targetLanguage)}
@@ -451,6 +519,11 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               Translated using {lastTranslation.translation_engine}
               {lastTranslation.confidence && (
                 <span> • Confidence: {Math.round(lastTranslation.confidence * 100)}%</span>
+              )}
+              {!isAuthenticated && translatedText && (
+                <div className="mt-1 text-xs text-blue-600">
+                  Login to save your translations
+                </div>
               )}
             </div>
           )}

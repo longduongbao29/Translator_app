@@ -49,23 +49,31 @@ async def translate_text(
                 request.target_language
             )
         
-        # Save to database
-        db_translation = Translation(
-            user_id=user_id,
-            source_text=result.source_text,
-            translated_text=result.translated_text,
-            source_language=result.source_language,
-            target_language=result.target_language,
-            translation_engine=result.translation_engine,
-            is_favorite=False
-        )
-        db.add(db_translation)
-        db.commit()
-        db.refresh(db_translation)
-        
-        result.id = db_translation.id
-        result.created_at = db_translation.created_at
-        result.is_favorite = db_translation.is_favorite
+        # Save to database only if user is logged in
+        db_translation = None
+        if user_id is not None:
+            db_translation = Translation(
+                user_id=user_id,
+                source_text=result.source_text,
+                translated_text=result.translated_text,
+                source_language=result.source_language,
+                target_language=result.target_language,
+                translation_engine=result.translation_engine,
+                is_favorite=False
+            )
+            db.add(db_translation)
+            db.commit()
+            db.refresh(db_translation)
+            
+            # Set database fields in result only if translation was saved
+            result.id = db_translation.id
+            result.created_at = db_translation.created_at
+            result.is_favorite = db_translation.is_favorite
+        else:
+            # For non-logged-in users, set default values
+            result.id = None
+            result.created_at = datetime.now()
+            result.is_favorite = False
         
         return result
         
@@ -252,6 +260,48 @@ async def toggle_favorite_translation(
         db.refresh(translation)
             
         return {"success": True, "translation": translation}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.delete("/history")
+async def clear_translation_history(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Delete all translation history for the current user"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    try:
+        # Verify token and get user
+        from app.services.auth import verify_token, get_user_by_username
+        username = verify_token(credentials.credentials)
+        if not username:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        user = get_user_by_username(db, username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Delete all translations for this user
+        deleted_count = db.query(Translation).filter(Translation.user_id == user.id).delete()
+        db.commit()
+            
+        return {"success": True, "deleted_count": deleted_count, "message": "All translation history cleared"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

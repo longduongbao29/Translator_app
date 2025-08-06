@@ -111,6 +111,56 @@ export const translationApi = {
       };
     }
   },
+
+  // Get favorite translations
+  getFavorites: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
+    try {
+      const response = await api.get(`/translate/favorites?skip=${skip}&limit=${limit}`);
+      return {
+        data: response.data.favorites,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch favorites',
+        success: false,
+      };
+    }
+  },
+
+  // Toggle favorite status for a translation
+  toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put(`/translate/favorite/${translationId}`, {
+        is_favorite: isFavorite
+      });
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update favorite status',
+        success: false,
+      };
+    }
+  },
+
+  // Clear all translation history
+  clearHistory: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.delete('/translate/history');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to clear history',
+        success: false,
+      };
+    }
+  },
 };
 
 export const speechToTextApi = {
